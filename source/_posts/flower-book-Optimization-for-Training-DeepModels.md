@@ -130,7 +130,218 @@ $$
 #### 2.8 Theoretical Limits of Optimization
 
 ### 3. Basic Algorithms
+
+#### 3.1 SGD
+按照数据生成分布，随机抽取m个小批量独立同分布的训练样本，我们能得到梯度的无偏估计。
+***
+
+算法1 ： SGD
+Require: 学习率$\epsilon_k$
+Require: 初始参数$\theta$
+$k \leftarrow 1$
+while 未满足迭代停止条件 do
+
+- 从训练集合中抽样出m个样本
+- 计算梯度估计：$ \hat{g} \leftarrow \frac{1}{m}\Delta_{\theta} \Sigma_{i}L(f(x^{(i)};\theta), y^{(i)})$
+- 更新梯度： $\theta \leftarrow \theta - \epsilon_k\hat{g}$
+- $k \leftarrow k + 1$
+
+end wile
+
+***
+其中一个关键参数是学习率。实践中，SGD的学习率需要随着迭代而减小，这是因为，由于抽样，会引入噪声，在极小值点，当前minibatch算出来的梯度也不一定会是0。
+batch模式的梯度下降，由于每次都用了所有的训练数据，所以可以用一个固定的学习率。
+SGD收敛的一个充分条件是：
+$$
+\Sigma_{k=1}^\infty \epsilon_k = \infty,\\
+\Sigma_{k=1}^\infty \epsilon_k^2 \lt \infty.
+$$
+实践中学习率常常随迭代线性减少，设为：
+$$
+\epsilon_k = (1 - \alpha)\epsilon_0 + \alpha\epsilon_\tau
+$$
+其中$\alpha = \frac{k}{\tau}$，经过多次迭代后，学习率可以设为一个较小的常数。
+学习率可通过试验和误差来选取，通常最好的选择方法是监测目标函数值随时间变化的学习曲线。通常$\epsilon_\tau$ 应设为$\epsilon_0$的1%左右。
+难的是如何设置$\epsilon_0$。
+- $\epsilon_0$太大，会使代价函数剧烈震荡。
+- $\epsilon_0$太小，会使学习变得非常缓慢。
+
+`选取$\epsilon_0$时，最好监督刚开始的几轮迭代，选取比最优的那个高一点的学习率， 但是又不会高到会引起剧烈震荡。`
+SGD一个重要的性质是每一步迭代的时间不依赖训练样本的多少。另一个重要性质是，只需要少量样本就可以实现在初始几次迭代的快速更新。本章的其他改进算法都受益于这个性质。
+
+#### 3.2 Momentum
+随机梯度下降学习过程有时候会很慢。动量方法可以加速学习，特别是对高曲率，小但一致的梯度，或是带噪声的梯度有效。
+* 从形式上看，动量算法引入变量v充当速度角色。我们假设是单位质量，所以动量就是速度向量v。
+* 从优化算法上看，v就是描述参数空间移动的方向和速率。
+* 从计算逻辑上看，v被设为负梯度的指数衰减平均。
+
+***
+
+Algorithms 2： SGD with momentum
+Require: learning rate $\epsilon$, momentum parameter $\alpha$
+Require: Initial parameters $\theta$, initial valocity $v$
+while stop cretorien not met do:
+
+- sample minibatch with m examples
+- compute gradient estimate: $g \leftarrow \frac{1}{m}\Delta_\theta \Sigma_{i}L(f(x^{(i)};\theta), y^{(i)})$
+- compute velocity update $v \leftarrow \alpha v - \epsilon g$
+- update parameters $\theta \leftarrow \theta + v$
+
+end while
+***
+
+`在实践中，α的一般取值为 0.5，0.9 和 0.99。和学习率一样，α也会随着时间不断调整。一般初始值是一个较小的值，随后会慢慢变大。随着时间推移调整 α 没有收缩 ε重要。`
+
+#### 3.3 Nesterov Momentum
+Nesterov 梯度加速算法启发了这种Momentum的变形。
+Nesterov momentum跟标准momentum的区别是：__Nesterov 中计算梯度实在施加当前速度之后，相当于给标准momentum加了一个校正因子。__
+***
+
+Algorithms 3： SGD with Nesterov momentum
+Require: learning rate $\epsilon$, momentum parameter $\alpha$
+Require: Initial parameters $\theta$, initial valocity $v$
+while stop cretorien not met do:
+
+- sample minibatch with m examples
+- apply interim update: $\tilde{\theta} \leftarrow \theta + \alpha v
+- compute gradient estimate: $g \leftarrow \frac{1}{m}\Delta_\theta \Sigma_{i}L(f(x^{(i)};\tilde{\theta}), y^{(i)})$
+- compute velocity update $v \leftarrow \alpha v - \epsilon g$
+- update parameters $\theta \leftarrow \theta + v$
+
+end while
+***
+
+__效果__: 在凸批量梯度情况下，额外误差收敛率由O(1/k)降低到O(1/k^2)。对随机梯度没有改进效果。
+
+
 ### 4. Parameter Initialization Strategies
+有些优化算是非迭代的，只求一个解。还有一些优化算法是迭代的，但是它们可以在可接受的时间范围内收敛到可接受的解。
+但是深度学习通常没有这种比较好的性质，初始值对它的影响比较大：
+* 会影响到是否收敛
+* 会影响收敛的速度
+* 会影响收敛到到的loss的高低
+* 在差不多的Loss水平，会影响泛化能力的强弱
+
+目前我们对于初始化策略的理解还是简单的，启发式的。
+
+现在完全确定的唯一特性是初始参数在不同的节点间“破坏对称性”。
+
+通常情况下，我们随机初始化节点权重，从高斯或均匀分布中随机挑选出值，可以启发式地挑选偏执常数。
+
+#### 权重
+目前有的一些经验是:
+* 较大的初始权重有助于破坏对称性，避免冗余单元
+* 但是太大的权重，可能在迭代的过程中梯度爆炸，使节点saturate，对于CNN，可能会导致混沌（choas，对很小的绕对很敏感）
+
+优化观点建议权重应该足够大以成功传播信息，但是正则化希望其小一点。
+
+一种简单的启发式方法是从分布$U(-\frac{1}{\sqrt{m}}, \frac{1}{\sqrt{m}})$中采样权重，其中m是输入节点的个数。
+Bengio建议采用标准初始化：
+$$
+W_{i,j} \sim U(-\sqrt{\frac{6}{m+n}}, \sqrt{\frac{6}{m+n}})
+$$
+其中m和n分别是输入和输出的个数。
+这种方法是使节点具有相同激活方差和相同梯度方差的折衷。
+
+Saxe推荐初始化为随机正交矩阵，仔细挑选负责每一层非线性缩 放或增益 (gain) 因子 g。
+Marten提出了一种稀疏初始化(sparse initialization)的方案。
+以上是针对权重的初始化，其他参数的初始化通常更容易一些。
+
+#### 偏置
+设置偏置的方法必须和设置权重的方法协调。设置偏置为零通常在大多数权重初始化方案中是可行的。存在一些我们可能设置偏置为非零值的情况:
+* 连在输出上的偏置，设置为输出的边缘统计通常是好的；
+* 在非线性的节点上，设置非0偏置以避免saturate;
+* 有时，一个单元会控制其他单元能否参与到等式中。例如LSTM中会设置偏置为1。
+
+#### 方差或精确度参数
+通常我们能安全地初始化方差或精确度参数为 1。
+另一种方 法假设初始权重足够接近零，设置偏置可以忽略权重的影响，然后设定偏置以产生输出的正确边缘均值，并将方差参数设置为训练集输出的边缘方差。
+
 ### 5. Algorithms with Adaptive Learning Rates
+学习率对模型的性能有着显著的影响。
+
+#### 5.1 AdaGrad
+AdaGrad在凸优化背景下效果很好。
+累加历史上各参数的梯度平方，对当前梯度进行缩放。
+$$
+r \leftarrow r + g \bigodot g \\
+\Delta \theta \leftarrow - \frac{\epsilon}{\delta + \sqrt{r}} \bigodot g \\
+\theta \leftarrow \theta + \Delta \theta
+$$
+
+#### 5.2 RMSProp
+修改了AdaGrad，改梯度积累为指数加权的移动平均，在非凸情况下表现更好。原因：
+1. AdaGrad在凸问题时能快速收敛。
+2. 但是对于非凸问题，学习轨迹可能穿过很多不同的结构，最终达到了一个凸碗的区域。
+3. 如果用AdaGrad的，这时候学习率可能在达到凸碗之前就已经太小了。
+4. RMSProp 使用指数衰减平均以丢弃遥远过去的历史，使其能够在找到凸碗状结构后快速收敛，它就像一个初始化于该碗状结构的 AdaGrad 算法实例。
+$$
+r \leftarrow (1 - \rho) + \rho g \bigodot g \\
+\Delta \theta \leftarrow - \frac{\epsilon}{\delta + \sqrt{r}} \bigodot g \\
+\theta \leftarrow \theta + \Delta \theta
+$$
+
+#### 5.3 Adam
+Momentum + RMSProp， 一阶的指数加权衰减 + 二阶的指数加权衰减。
+
+$$
+s \leftarrow \rho_1 s + (1 - \rho_1)g \\
+r \leftarrow \rho_2 r + (1 - \rho_2)g \bigodot g \\
+\hat{s} \leftarrow \frac{s}{1-\rho_{1}^{t}} \\
+\hat{r} \leftarrow \frac{r}{1-\rho_{2}^{t}} \\
+\Delta \theta = -\epsilon\frac{\hat{s}}{\sqrt{\hat{r}}+\delta} \\
+\theta \leftarrow \theta + \Delta
+$$
+
 ### 6. Approximate Second-Order Methods
+
+#### 6.1 Newton Method
+牛顿法是基于泰勒级数的二次展开。
+$$
+J(\theta) \approx J(\theta_0) + (\theta - \theta_0)\Delta_{\theta}J(\theta_0) - \frac{1}{2}(\theta - \theta_0)^{T}H(\theta - \theta_0)
+$$
+对$\theta$求导，令导数为0，得到参数的更新规则：
+$$
+\theta^* = \theta_0 - H^{-1}\Delta_{\theta}J(\theta_0)
+$$
+* 对于局部二次函数（H为正定矩阵），牛顿法会直接跳到极值点。
+* 是凸的但是非二次函数，可以用更新规则进行迭代。
+* 高维非凸，H的特征值并不都是正的（鞍点），可以给H加正则（加对角矩阵），使调整后的H特征值都是正的。
+
+除了鞍点会限制牛顿法的使用，计算H的逆也是一个很大的负担。k*k的矩阵的逆，计算复杂度为$O(k^3)$。
+
+#### 6.2 Conjugate Gradients
+
+#### 6.3 BFGS
+
+
+
 ### 7. Optimization Strategies and Meta-Algorithms
+
+#### 7.1 Batch Normalization
+并不是一个优化算法，而是一个自适应的重参数化的方法，试图解决训练非常深的模型的困难。
+主要就是对每一层每个节点的mini-batch的输出，进行normalization操作。这样保证下一层接受到的输入，都是一个标准正态分布。
+这意味着，梯度不会再简单地增加 hi 的标准差或均值;标准化操作会 除掉这一操作的影响，归零其在梯度中的元素。
+在测试阶段，μ 和 σ 可以被替换为训练阶段收集的运行均值。这使得模型可以 对单一样本评估，而无需使用定义于整个小批量的 μ 和 σ。
+
+标准化一个单元的均值和标准差会降低包含该单元的神经网络的表达能力。为了保持网络的表现力，通常会将批量隐藏单元激活$H$替换为 γH ′ + β，而不是简单地使用标准化的H'。
+(后续补充一些细节)
+
+#### 7.2 Coordinate Desent
+在某些情况下，将一个优化问题分解成几个部分，可以更快地解决原问题。
+简单来说就是固定某些变量，迭代另外一些变量，反复迭代进行。
+当优化问题中的不同变量能够清楚地分成相对独立的组，或是当优化一组变量 明显比优化所有变量效率更高时，坐标下降最有意义 。
+当一个变量的值很大程度地影响另一个变量的最优值时，坐标下降不是一个很好的方法。
+
+#### 7.3 Polyak avarage
+平均优化学习轨迹上的几个点，用于非凸问题上时，就是exponential decay。
+
+#### 7.4 supervise pre-Training
+有时，如果模型太复杂难以优化，或是如果任务非常困难，直接训练模型来解 决特定任务的挑战可能太大。有时训练一个较简单的模型来求解问题，然后使模型 更复杂会更有效。训练模型来求解一个简化的问题，然后转移到最后的问题，有时 也会更有效些。
+
+* 贪心监督预训练
+* 迁移学习
+
+#### 7.5 Designing Models to Aid Optimization
+
+#### 7.6 Continuation Methods and Curriculum Learning
