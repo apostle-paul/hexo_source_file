@@ -264,8 +264,8 @@ Marten提出了一种稀疏初始化(sparse initialization)的方案。
 AdaGrad在凸优化背景下效果很好。
 累加历史上各参数的梯度平方，对当前梯度进行缩放。
 $$
-r \leftarrow r + g \bigodot g \\
-\Delta \theta \leftarrow - \frac{\epsilon}{\delta + \sqrt{r}} \bigodot g \\
+r \leftarrow r + g \odot g \\
+\Delta \theta \leftarrow - \frac{\epsilon}{\delta + \sqrt{r}} \odot g \\
 \theta \leftarrow \theta + \Delta \theta
 $$
 
@@ -276,8 +276,8 @@ $$
 3. 如果用AdaGrad的，这时候学习率可能在达到凸碗之前就已经太小了。
 4. RMSProp 使用指数衰减平均以丢弃遥远过去的历史，使其能够在找到凸碗状结构后快速收敛，它就像一个初始化于该碗状结构的 AdaGrad 算法实例。
 $$
-r \leftarrow (1 - \rho) + \rho g \bigodot g \\
-\Delta \theta \leftarrow - \frac{\epsilon}{\delta + \sqrt{r}} \bigodot g \\
+r \leftarrow (1 - \rho) + \rho g \odot g \\
+\Delta \theta \leftarrow - \frac{\epsilon}{\delta + \sqrt{r}} \odot g \\
 \theta \leftarrow \theta + \Delta \theta
 $$
 
@@ -286,7 +286,7 @@ Momentum + RMSProp， 一阶的指数加权衰减 + 二阶的指数加权衰减�
 
 $$
 s \leftarrow \rho_1 s + (1 - \rho_1)g \\
-r \leftarrow \rho_2 r + (1 - \rho_2)g \bigodot g \\
+r \leftarrow \rho_2 r + (1 - \rho_2)g \odot g \\
 \hat{s} \leftarrow \frac{s}{1-\rho_{1}^{t}} \\
 \hat{r} \leftarrow \frac{r}{1-\rho_{2}^{t}} \\
 \Delta \theta = -\epsilon\frac{\hat{s}}{\sqrt{\hat{r}}+\delta} \\
