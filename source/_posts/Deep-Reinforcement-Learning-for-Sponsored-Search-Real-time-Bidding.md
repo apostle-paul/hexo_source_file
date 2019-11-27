@@ -7,7 +7,8 @@ tags:
 categories:
   - paper notes
 ---
-
+a paper from alibaba
+<!--more-->
 # 1. problem definition
 最开始，问题的定义是：
 $$
